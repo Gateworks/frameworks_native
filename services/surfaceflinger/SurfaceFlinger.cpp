@@ -543,8 +543,25 @@ status_t SurfaceFlinger::getDisplayConfigs(const sp<IBinder>& display,
     public:
         static int getEmuDensity() {
             return getDensityFromProperty("qemu.sf.lcd_density"); }
-        static int getBuildDensity()  {
-            return getDensityFromProperty("ro.sf.lcd_density"); }
+        static int getBuildDensity(const DisplayInfo& info)  {
+            static int density = getDensityFromProperty("ro.sf.lcd_density");
+            if (density == 0) {
+                uint32_t area = info.w * info.h;
+                if (area <= 800 * 480) {
+                    density = 120;
+                } else if (area <= 1024 * 600) {
+                    density = 130;
+                } else if (area < 1024 * 768) {
+                    density = 140;
+                } else if (area < 1920 * 1080) {
+                    density = 160;
+                } else {
+                    density = 240;
+                }
+                ALOGI("auto set density to %d", density);
+            }
+            return density;
+        }
     };
 
     configs->clear();
@@ -557,10 +574,12 @@ status_t SurfaceFlinger::getDisplayConfigs(const sp<IBinder>& display,
 
         float xdpi = hwConfig.xdpi;
         float ydpi = hwConfig.ydpi;
+        info.w = hwConfig.width;
+        info.h = hwConfig.height;
 
         if (type == DisplayDevice::DISPLAY_PRIMARY) {
             // The density of the device is provided by a build property
-            float density = Density::getBuildDensity() / 160.0f;
+            float density = Density::getBuildDensity(info) / 160.0f;
             if (density == 0) {
                 // the build doesn't provide a density -- this is wrong!
                 // use xdpi instead
